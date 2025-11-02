@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartTicket - Sistema de Ticket Inteligente</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: #f4f6f9;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    header {
+      background-color: #0077b6;
+      color: white;
+      text-align: center;
+      width: 100%;
+      padding: 20px 0;
+    }
+
+    .container {
+      background: white;
+      margin-top: 20px;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      max-width: 600px;
+      width: 90%;
+    }
+
+    .input-group {
+      margin-bottom: 15px;
+    }
+
+    label {
+      font-weight: bold;
+      display: block;
+      margin-bottom: 5px;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      font-size: 1em;
+    }
+
+    button {
+      background-color: #0077b6;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 1em;
+    }
+
+    button:hover {
+      background-color: #005f87;
+    }
+
+    table {
+      width: 100%;
+      margin-top: 20px;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid #ddd;
+      text-align: center;
+    }
+
+    th {
+      background-color: #0077b6;
+      color: white;
+    }
+
+    .status {
+      font-weight: bold;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 5px;
+    }
+
+    .status.valido {
+      background-color: #4CAF50;
+    }
+
+    .status.proximo {
+      background-color: #FFA500;
+    }
+
+    .status.vencido {
+      background-color: #E63946;
+    }
+
+    .alerta {
+      background-color: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeeba;
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>SmartTicket</h1>
+    <p>Sistema de Ticket Inteligente para Controle de Validade</p>
+  </header>
+
+  <div class="container">
+    <div id="alertas"></div>
+
+    <h2>Cadastrar Produto</h2>
+    <div class="input-group">
+      <label for="nome">Nome do produto:</label>
+      <input type="text" id="nome" placeholder="Ex: Leite Integral" />
+    </div>
+    <div class="input-group">
+      <label for="validade">Data de validade:</label>
+      <input type="date" id="validade" />
+    </div>
+    <div class="input-group">
+      <label for="prazo">Prazo de consumo ideal (dias antes do vencimento):</label>
+      <input type="number" id="prazo" min="1" placeholder="Ex: 3" />
+    </div>
+    <button id="btnAdicionar">Adicionar Produto</button>
+
+    <h2>Lista de Produtos</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Produto</th>
+          <th>Validade</th>
+          <th>Prazo Ideal</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="listaProdutos"></tbody>
+    </table>
+  </div>
+
+  <script>
+    // Recupera os produtos armazenados (ou cria uma lista vazia)
+    let produtos = JSON.parse(localStorage.getItem("produtos")) || [];
+
+    // Salva os produtos no localStorage
+    function salvarLocalStorage() {
+      localStorage.setItem("produtos", JSON.stringify(produtos));
+    }
+
+    // Calcula o status com base na data de validade e no prazo
+    function calcularStatus(dataValidade, prazo) {
+      const hoje = new Date();
+      const validade = new Date(dataValidade + "T00:00:00"); // evita erro de fuso horário
+      const diferencaDias = Math.ceil((validade - hoje) / (1000 * 60 * 60 * 24));
+
+      if (isNaN(diferencaDias)) {
+        return { status: "Data inválida", classe: "vencido" };
+      }
+
+      if (diferencaDias < 0) return { status: "Vencido", classe: "vencido" };
+      if (diferencaDias <= prazo) return { status: "Próximo do vencimento", classe: "proximo" };
+      return { status: "Válido", classe: "valido" };
+    }
+
+    // Adiciona um novo produto
+    function adicionarProduto() {
+      const nome = document.getElementById("nome").value.trim();
+      const validade = document.getElementById("validade").value;
+      const prazo = parseInt(document.getElementById("prazo").value);
+
+      if (!nome || !validade || isNaN(prazo)) {
+        alert("Por favor, preencha todos os campos corretamente.");
+        return;
+      }
+
+      const produto = { nome, validade, prazo };
+      produtos.push(produto);
+      salvarLocalStorage();
+
+      renderizarTabela();
+      verificarAlertas();
+
+      // Limpa os campos
+      document.getElementById("nome").value = "";
+      document.getElementById("validade").value = "";
+      document.getElementById("prazo").value = "";
+    }
+
+    // Renderiza a tabela
+    function renderizarTabela() {
+      const lista = document.getElementById("listaProdutos");
+      lista.innerHTML = "";
+
+      if (produtos.length === 0) {
+        lista.innerHTML = `<tr><td colspan="4">Nenhum produto cadastrado.</td></tr>`;
+        return;
+      }
+
+      produtos.forEach((p) => {
+        const status = calcularStatus(p.validade, p.prazo);
+        const linha = `
+          <tr>
+            <td>${p.nome}</td>
+            <td>${new Date(p.validade).toLocaleDateString("pt-BR")}</td>
+            <td>${p.prazo} dias</td>
+            <td><span class="status ${status.classe}">${status.status}</span></td>
+          </tr>
+        `;
+        lista.innerHTML += linha;
+      });
+    }
+
+    // Exibe alertas automáticos
+    function verificarAlertas() {
+      const alertas = document.getElementById("alertas");
+      alertas.innerHTML = "";
+      let mensagens = [];
+
+      produtos.forEach((p) => {
+        const status = calcularStatus(p.validade, p.prazo);
+        if (status.classe === "proximo") {
+          mensagens.push(`⚠️ O produto <b>${p.nome}</b> está próximo do vencimento.`);
+        } else if (status.classe === "vencido") {
+          mensagens.push(`❌ O produto <b>${p.nome}</b> já está vencido!`);
+        }
+      });
+
+      if (mensagens.length > 0) {
+        alertas.innerHTML = `<div class="alerta">${mensagens.join("<br>")}</div>`;
+      }
+    }
+
+    // Eventos
+    document.getElementById("btnAdicionar").addEventListener("click", adicionarProduto);
+
+    // Inicializa o app
+    renderizarTabela();
+    verificarAlertas();
+  </script>
+</body>
+</html>
